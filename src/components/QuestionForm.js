@@ -9,8 +9,10 @@ import {
   ListItem,
   Paper,
   Typography,
-  Divider,
 } from '@mui/material';
+
+// Definimos la URL base como constante
+const BASE_URL = 'https://backend-ai-e3o2.onrender.com/';
 
 const ChatBox = () => {
   const [message, setMessage] = useState('');
@@ -20,7 +22,7 @@ const ChatBox = () => {
   const [options, setOptions] = useState(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [webPreview, setWebPreview] = useState(null);
-  const [pendingQuestion, setPendingQuestion] = useState(null); // Guardar la pregunta pendiente
+  const [pendingQuestion, setPendingQuestion] = useState(null);
   const chatEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -45,7 +47,7 @@ const ChatBox = () => {
     setChatHistory((prev) => [...prev, userMessage]);
 
     try {
-      const response = await axios.post('http://localhost:3000/api/ask', { question: message }, { timeout: 5000 });
+      const response = await axios.post(`${BASE_URL}api/ask`, { question: message }, { timeout: 5000 });
       const data = response.data;
 
       if (data.found) {
@@ -81,7 +83,7 @@ const ChatBox = () => {
           setLoading(false);
           return;
         }
-        const response = await axios.post('http://localhost:3000/api/handleResponse', {
+        const response = await axios.post(`${BASE_URL}api/handleResponse`, {
           question: pendingQuestion,
           option,
           userAnswer,
@@ -94,7 +96,7 @@ const ChatBox = () => {
           setPendingQuestion(null);
         }
       } else if (option === 'searchWeb') {
-        const response = await axios.post('http://localhost:3000/api/handleResponse', {
+        const response = await axios.post(`${BASE_URL}api/handleResponse`, {
           question: pendingQuestion,
           option,
         });
@@ -126,7 +128,7 @@ const ChatBox = () => {
   const handleConfirmWeb = async (confirm) => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3000/api/handleResponse', {
+      const response = await axios.post(`${BASE_URL}api/handleResponse`, {
         question: pendingQuestion,
         option: 'searchWeb',
         confirmWeb: confirm,
@@ -171,7 +173,6 @@ const ChatBox = () => {
                     {msg.timestamp}
                   </Typography>
                 </Paper>
-                {/* Mostrar opciones dentro del chat */}
                 {msg.isOptions && options && (
                   <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
                     <Button
@@ -190,7 +191,6 @@ const ChatBox = () => {
                     </Button>
                   </Box>
                 )}
-                {/* Mostrar previsualización de la web dentro del chat */}
                 {msg.isWebPreview && webPreview && (
                   <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
                     <Button
@@ -216,7 +216,6 @@ const ChatBox = () => {
         </List>
       </Box>
 
-      {/* Campo para escribir la respuesta del usuario si elige "Dar mi respuesta" */}
       {options && options.includes('provideAnswer') && (
         <Box sx={{ mb: 2 }}>
           <TextField
@@ -230,7 +229,6 @@ const ChatBox = () => {
         </Box>
       )}
 
-      {/* Input y botón de envío */}
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
         <TextField
           fullWidth
