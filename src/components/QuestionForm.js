@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -10,8 +10,6 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
-
-const BASE_URL = 'https://backend-ai-e3o2.onrender.com/';
 
 const ChatBox = () => {
   const [message, setMessage] = useState('');
@@ -28,10 +26,6 @@ const ChatBox = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory]);
-
   const handleSend = async (e) => {
     e.preventDefault();
 
@@ -47,58 +41,34 @@ const ChatBox = () => {
     setUserAnswer('');
 
     const userMessage = { type: 'user', text: message.trim(), timestamp: new Date().toLocaleString() };
-    setChatHistory((prev) => {
-      const lastMessage = prev[prev.length - 1];
-      if (lastMessage?.type === userMessage.type && lastMessage?.text === userMessage.text) {
-        return prev;
-      }
-      return [...prev, userMessage];
-    });
+    setChatHistory((prev) => [...prev, userMessage]);
 
     try {
-      const response = await axios.post(`${BASE_URL}api/ask`, { question: message }, { timeout: 5000 });
+      const response = await axios.post('https://backend-ai-e3o2.onrender.com/api/ask', { question: message }, { timeout: 5000 });
       const data = response.data;
 
       if (data.found) {
-        const botMessage = {
-          type: 'bot',
-          text: data.answer || data.message || 'Respuesta no disponible',
-          timestamp: new Date().toLocaleString(),
-        };
-        if (data.answer?.includes('¿Otro') || data.answer?.includes('otro?')) {
-          botMessage.isJoke = true;
-        }
-        setChatHistory((prev) => {
-          const lastMessage = prev[prev.length - 1];
-          if (lastMessage?.type === botMessage.type && lastMessage?.text === botMessage.text) {
-            return prev;
-          }
-          return [...prev, botMessage];
-        });
+        const botMessage = { type: 'bot', text: data.answer, timestamp: new Date().toLocaleString() };
+        setChatHistory((prev) => [...prev, botMessage]);
       } else {
         setOptions(data.options);
         setPendingQuestion(message.trim());
         const botMessage = {
           type: 'bot',
-          text: data.message || 'No tengo una respuesta para eso. ¿Qué quieres hacer?',
+          text: 'No tengo una respuesta para eso. ¿Qué quieres hacer?',
           isOptions: true,
           timestamp: new Date().toLocaleString(),
         };
-        setChatHistory((prev) => {
-          const lastMessage = prev[prev.length - 1];
-          if (lastMessage?.type === botMessage.type && lastMessage?.text === botMessage.text) {
-            return prev;
-          }
-          return [...prev, botMessage];
-        });
+        setChatHistory((prev) => [...prev, botMessage]);
       }
     } catch (error) {
-      const errorText = error.response?.data?.error || 'Uy, algo salió mal. ¿Intentamos de nuevo?';
-      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
+      const errorMessage = error.response?.data?.error || 'Error al procesar el mensaje';
+      const botMessage = { type: 'bot', text: errorMessage, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
       setMessage('');
+      scrollToBottom();
     }
   };
 
@@ -111,24 +81,20 @@ const ChatBox = () => {
           setLoading(false);
           return;
         }
-        const response = await axios.post(`${BASE_URL}api/handleResponse`, {
+        const response = await axios.post('https://backend-ai-e3o2.onrender.com/api/handleResponse', {
           question: pendingQuestion,
           option,
           userAnswer,
         });
         if (response.data.success) {
-          const botMessage = {
-            type: 'bot',
-            text: response.data.message || `¡Gracias! Guardé tu respuesta: ${response.data.answer}`,
-            timestamp: new Date().toLocaleString(),
-          };
+          const botMessage = { type: 'bot', text: response.data.answer, timestamp: new Date().toLocaleString() };
           setChatHistory((prev) => [...prev, botMessage]);
           setOptions(null);
           setUserAnswer('');
           setPendingQuestion(null);
         }
       } else if (option === 'searchWeb') {
-        const response = await axios.post(`${BASE_URL}api/handleResponse`, {
+        const response = await axios.post('https://backend-ai-e3o2.onrender.com/api/handleResponse', {
           question: pendingQuestion,
           option,
         });
@@ -136,85 +102,55 @@ const ChatBox = () => {
           setWebPreview(response.data.preview);
           const botMessage = {
             type: 'bot',
-            text: response.data.message || `Encontrado en la web: ${response.data.preview}. ¿Quieres guardar esta respuesta?`,
+            text: `Encontrado en la web: ${response.data.preview}. ¿Quieres guardar esta respuesta?`,
             isWebPreview: true,
             timestamp: new Date().toLocaleString(),
           };
           setChatHistory((prev) => [...prev, botMessage]);
         } else {
-          const botMessage = {
-            type: 'bot',
-            text: response.data.message || 'No encontré nada útil en la web. ¿Otra idea?',
-            timestamp: new Date().toLocaleString(),
-          };
+          const botMessage = { type: 'bot', text: 'No se encontró respuesta en la web', timestamp: new Date().toLocaleString() };
           setChatHistory((prev) => [...prev, botMessage]);
           setOptions(null);
           setPendingQuestion(null);
         }
       }
     } catch (error) {
-      const errorText = error.response?.data?.error || 'Error al procesar la opción';
-      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
+      const errorMessage = error.response?.data?.error || 'Error al procesar la opción';
+      const botMessage = { type: 'bot', text: errorMessage, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
+      scrollToBottom();
     }
   };
 
   const handleConfirmWeb = async (confirm) => {
     setLoading(true);
     try {
-      const response = await axios.post(`${BASE_URL}api/handleResponse`, {
+      const response = await axios.post('https://backend-ai-e3o2.onrender.com/api/handleResponse', {
         question: pendingQuestion,
         option: 'searchWeb',
         confirmWeb: confirm,
       });
-      const botMessage = {
-        type: 'bot',
-        text: confirm
-          ? (response.data.message || '¡Guardado! Esa respuesta ya está en mi memoria.')
-          : 'Vale, no guardé la respuesta. ¿Qué más quieres hacer?',
-        timestamp: new Date().toLocaleString(),
-      };
-      setChatHistory((prev) => [...prev, botMessage]);
+      if (confirm && response.data.success) {
+        const botMessage = { type: 'bot', text: response.data.answer, timestamp: new Date().toLocaleString() };
+        setChatHistory((prev) => [...prev, botMessage]);
+      }
       setOptions(null);
       setWebPreview(null);
       setPendingQuestion(null);
     } catch (error) {
-      const errorText = error.response?.data?.error || 'Error al confirmar la respuesta';
-      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
+      const errorMessage = error.response?.data?.error || 'Error al confirmar la respuesta';
+      const botMessage = { type: 'bot', text: errorMessage, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAnotherJoke = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.post(`${BASE_URL}api/ask`, { question: 'Dime otro chiste' }, { timeout: 5000 });
-      const data = response.data;
-      const botMessage = {
-        type: 'bot',
-        text: data.answer || data.message || 'Uy, se me acabaron los chistes por ahora.',
-        timestamp: new Date().toLocaleString(),
-      };
-      if (data.answer?.includes('¿Otro') || data.answer?.includes('otro?')) {
-        botMessage.isJoke = true;
-      }
-      setChatHistory((prev) => [...prev, botMessage]);
-    } catch (error) {
-      const errorText = error.response?.data?.error || 'Uy, se me acabaron los chistes por ahora.';
-      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
-      setChatHistory((prev) => [...prev, botMessage]);
-    } finally {
-      setLoading(false);
+      scrollToBottom();
     }
   };
 
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto', mt: 4, p: 2, bgcolor: '#f5f5f5', borderRadius: 2, height: '70vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Historial de chat */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 2 }}>
         <List>
           {chatHistory.map((msg, index) => (
@@ -242,7 +178,6 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleOption('provideAnswer')}
-                      disabled={loading}
                     >
                       Dar mi respuesta
                     </Button>
@@ -250,7 +185,6 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleOption('searchWeb')}
-                      disabled={loading}
                     >
                       Buscar en internet
                     </Button>
@@ -262,29 +196,15 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleConfirmWeb(true)}
-                      disabled={loading}
                     >
-                      Guardar
+                      Sí
                     </Button>
                     <Button
                       variant="outlined"
                       size="small"
                       onClick={() => handleConfirmWeb(false)}
-                      disabled={loading}
                     >
-                      Descartar
-                    </Button>
-                  </Box>
-                )}
-                {msg.isJoke && (
-                  <Box sx={{ mt: 1 }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleAnotherJoke}
-                      disabled={loading}
-                    >
-                      Otro chiste
+                      No
                     </Button>
                   </Box>
                 )}
@@ -304,9 +224,6 @@ const ChatBox = () => {
             placeholder="Escribe tu respuesta..."
             variant="outlined"
             size="small"
-            error={!!error}
-            helperText={error}
-            disabled={loading}
           />
         </Box>
       )}
