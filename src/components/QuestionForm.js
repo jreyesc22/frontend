@@ -48,7 +48,6 @@ const ChatBox = () => {
 
     const userMessage = { type: 'user', text: message.trim(), timestamp: new Date().toLocaleString() };
     setChatHistory((prev) => {
-      // Evitar duplicados comparando el texto y tipo
       const lastMessage = prev[prev.length - 1];
       if (lastMessage?.type === userMessage.type && lastMessage?.text === userMessage.text) {
         return prev;
@@ -61,8 +60,12 @@ const ChatBox = () => {
       const data = response.data;
 
       if (data.found) {
-        const botMessage = { type: 'bot', text: data.answer, timestamp: new Date().toLocaleString() };
-        if (data.answer.includes('¿Otro') || data.answer.includes('otro?')) {
+        const botMessage = {
+          type: 'bot',
+          text: data.answer || data.message || 'Respuesta no disponible',
+          timestamp: new Date().toLocaleString(),
+        };
+        if (data.answer?.includes('¿Otro') || data.answer?.includes('otro?')) {
           botMessage.isJoke = true;
         }
         setChatHistory((prev) => {
@@ -90,7 +93,7 @@ const ChatBox = () => {
         });
       }
     } catch (error) {
-      const errorText = error.response?.data?.message || 'Uy, algo salió mal. ¿Intentamos de nuevo?';
+      const errorText = error.response?.data?.error || 'Uy, algo salió mal. ¿Intentamos de nuevo?';
       const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
@@ -133,20 +136,24 @@ const ChatBox = () => {
           setWebPreview(response.data.preview);
           const botMessage = {
             type: 'bot',
-            text: response.data.preview,
+            text: response.data.message || `Encontrado en la web: ${response.data.preview}. ¿Quieres guardar esta respuesta?`,
             isWebPreview: true,
             timestamp: new Date().toLocaleString(),
           };
           setChatHistory((prev) => [...prev, botMessage]);
         } else {
-          const botMessage = { type: 'bot', text: 'No encontré nada útil en la web. ¿Otra idea?', timestamp: new Date().toLocaleString() };
+          const botMessage = {
+            type: 'bot',
+            text: response.data.message || 'No encontré nada útil en la web. ¿Otra idea?',
+            timestamp: new Date().toLocaleString(),
+          };
           setChatHistory((prev) => [...prev, botMessage]);
           setOptions(null);
           setPendingQuestion(null);
         }
       }
     } catch (error) {
-      const errorText = error.response?.data?.message || 'Error al procesar la opción';
+      const errorText = error.response?.data?.error || 'Error al procesar la opción';
       const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
@@ -162,22 +169,19 @@ const ChatBox = () => {
         option: 'searchWeb',
         confirmWeb: confirm,
       });
-      if (confirm && response.data.success) {
-        const botMessage = {
-          type: 'bot',
-          text: response.data.message || '¡Guardado! Esa respuesta ya está en mi memoria.',
-          timestamp: new Date().toLocaleString(),
-        };
-        setChatHistory((prev) => [...prev, botMessage]);
-      } else if (!confirm) {
-        const botMessage = { type: 'bot', text: 'Vale, no lo guardo. ¿Qué más quieres hacer?', timestamp: new Date().toLocaleString() };
-        setChatHistory((prev) => [...prev, botMessage]);
-      }
+      const botMessage = {
+        type: 'bot',
+        text: confirm
+          ? (response.data.message || '¡Guardado! Esa respuesta ya está en mi memoria.')
+          : 'Vale, no guardé la respuesta. ¿Qué más quieres hacer?',
+        timestamp: new Date().toLocaleString(),
+      };
+      setChatHistory((prev) => [...prev, botMessage]);
       setOptions(null);
       setWebPreview(null);
       setPendingQuestion(null);
     } catch (error) {
-      const errorText = error.response?.data?.message || 'Error al confirmar la respuesta';
+      const errorText = error.response?.data?.error || 'Error al confirmar la respuesta';
       const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
@@ -189,15 +193,19 @@ const ChatBox = () => {
     setLoading(true);
     try {
       const response = await axios.post(`${BASE_URL}api/ask`, { question: 'Dime otro chiste' }, { timeout: 5000 });
+      const data = response.data;
       const botMessage = {
         type: 'bot',
-        text: response.data.answer,
-        isJoke: true,
+        text: data.answer || data.message || 'Uy, se me acabaron los chistes por ahora.',
         timestamp: new Date().toLocaleString(),
       };
+      if (data.answer?.includes('¿Otro') || data.answer?.includes('otro?')) {
+        botMessage.isJoke = true;
+      }
       setChatHistory((prev) => [...prev, botMessage]);
     } catch (error) {
-      const botMessage = { type: 'bot', text: 'Uy, se me acabaron los chistes por ahora.', timestamp: new Date().toLocaleString() };
+      const errorText = error.response?.data?.error || 'Uy, se me acabaron los chistes por ahora.';
+      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
@@ -234,6 +242,7 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleOption('provideAnswer')}
+                      disabled={loading}
                     >
                       Dar mi respuesta
                     </Button>
@@ -241,6 +250,7 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleOption('searchWeb')}
+                      disabled={loading}
                     >
                       Buscar en internet
                     </Button>
@@ -252,6 +262,7 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleConfirmWeb(true)}
+                      disabled={loading}
                     >
                       Guardar
                     </Button>
@@ -259,6 +270,7 @@ const ChatBox = () => {
                       variant="outlined"
                       size="small"
                       onClick={() => handleConfirmWeb(false)}
+                      disabled={loading}
                     >
                       Descartar
                     </Button>
@@ -294,6 +306,7 @@ const ChatBox = () => {
             size="small"
             error={!!error}
             helperText={error}
+            disabled={loading}
           />
         </Box>
       )}
