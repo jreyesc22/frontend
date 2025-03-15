@@ -62,13 +62,22 @@ const ChatBox = () => {
 
       if (data.found) {
         const botMessage = { type: 'bot', text: data.answer, timestamp: new Date().toLocaleString() };
-        setChatHistory((prev) => [...prev, botMessage]);
+        if (data.answer.includes('¿Otro') || data.answer.includes('otro?')) {
+          botMessage.isJoke = true;
+        }
+        setChatHistory((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage?.type === botMessage.type && lastMessage?.text === botMessage.text) {
+            return prev;
+          }
+          return [...prev, botMessage];
+        });
       } else {
         setOptions(data.options);
         setPendingQuestion(message.trim());
         const botMessage = {
           type: 'bot',
-          text: 'No tengo una respuesta para eso. ¿Qué quieres hacer?',
+          text: data.message || 'No tengo una respuesta para eso. ¿Qué quieres hacer?',
           isOptions: true,
           timestamp: new Date().toLocaleString(),
         };
@@ -105,7 +114,11 @@ const ChatBox = () => {
           userAnswer,
         });
         if (response.data.success) {
-          const botMessage = { type: 'bot', text: response.data.answer, timestamp: new Date().toLocaleString() };
+          const botMessage = {
+            type: 'bot',
+            text: response.data.message || `¡Gracias! Guardé tu respuesta: ${response.data.answer}`,
+            timestamp: new Date().toLocaleString(),
+          };
           setChatHistory((prev) => [...prev, botMessage]);
           setOptions(null);
           setUserAnswer('');
@@ -120,7 +133,7 @@ const ChatBox = () => {
           setWebPreview(response.data.preview);
           const botMessage = {
             type: 'bot',
-            text: `Encontrado en la web: ${response.data.preview}. ¿Quieres guardar esta respuesta?`,
+            text: response.data.preview,
             isWebPreview: true,
             timestamp: new Date().toLocaleString(),
           };
@@ -150,14 +163,41 @@ const ChatBox = () => {
         confirmWeb: confirm,
       });
       if (confirm && response.data.success) {
-        const botMessage = { type: 'bot', text: response.data.answer, timestamp: new Date().toLocaleString() };
+        const botMessage = {
+          type: 'bot',
+          text: response.data.message || '¡Guardado! Esa respuesta ya está en mi memoria.',
+          timestamp: new Date().toLocaleString(),
+        };
+        setChatHistory((prev) => [...prev, botMessage]);
+      } else if (!confirm) {
+        const botMessage = { type: 'bot', text: 'Vale, no lo guardo. ¿Qué más quieres hacer?', timestamp: new Date().toLocaleString() };
         setChatHistory((prev) => [...prev, botMessage]);
       }
       setOptions(null);
       setWebPreview(null);
       setPendingQuestion(null);
     } catch (error) {
-      const botMessage = { type: 'bot', text: 'Error al confirmar la respuesta', timestamp: new Date().toLocaleString() };
+      const errorText = error.response?.data?.message || 'Error al confirmar la respuesta';
+      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
+      setChatHistory((prev) => [...prev, botMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnotherJoke = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`${BASE_URL}api/ask`, { question: 'Dime otro chiste' }, { timeout: 5000 });
+      const botMessage = {
+        type: 'bot',
+        text: response.data.answer,
+        isJoke: true,
+        timestamp: new Date().toLocaleString(),
+      };
+      setChatHistory((prev) => [...prev, botMessage]);
+    } catch (error) {
+      const botMessage = { type: 'bot', text: 'Uy, se me acabaron los chistes por ahora.', timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
