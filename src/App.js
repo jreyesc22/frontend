@@ -9,7 +9,7 @@ import QuestionForm from './components/QuestionForm';
 function App() {
   return (
     <div className="App">
-      <h1>Agente Inteligente</h1>
+      <h1>Agent Thor  </h1>
       <QuestionForm />
     </div>
   );
