@@ -1,16 +1,10 @@
 import React from 'react';
-import '@fontsource/roboto/300.css';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/700.css';
-
-import QuestionForm from './components/QuestionForm';
+import ChatBox from './components/ChatBox';
 
 function App() {
   return (
-    <div className="App">
-      <h1>Agent Thor  </h1>
-      <QuestionForm />
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <ChatBox />
     </div>
   );
 }
