@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -28,6 +28,10 @@ const ChatBox = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatHistory]);
+
   const handleSend = async (e) => {
     e.preventDefault();
 
@@ -43,7 +47,14 @@ const ChatBox = () => {
     setUserAnswer('');
 
     const userMessage = { type: 'user', text: message.trim(), timestamp: new Date().toLocaleString() };
-    setChatHistory((prev) => [...prev, userMessage]);
+    setChatHistory((prev) => {
+      // Evitar duplicados comparando el texto y tipo
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage?.type === userMessage.type && lastMessage?.text === userMessage.text) {
+        return prev;
+      }
+      return [...prev, userMessage];
+    });
 
     try {
       const response = await axios.post(`${BASE_URL}api/ask`, { question: message }, { timeout: 5000 });
@@ -51,21 +62,23 @@ const ChatBox = () => {
 
       if (data.found) {
         const botMessage = { type: 'bot', text: data.answer, timestamp: new Date().toLocaleString() };
-        // Detectar intent específico (ejemplo: chiste)
-        if (data.answer.includes('¿Otro') || data.answer.includes('otro?')) {
-          botMessage.isJoke = true; // Para mostrar botón "Otro chiste"
-        }
         setChatHistory((prev) => [...prev, botMessage]);
       } else {
         setOptions(data.options);
         setPendingQuestion(message.trim());
         const botMessage = {
           type: 'bot',
-          text: data.message || 'No tengo una respuesta para eso. ¿Qué quieres hacer?', // Usar mensaje del backend
+          text: 'No tengo una respuesta para eso. ¿Qué quieres hacer?',
           isOptions: true,
           timestamp: new Date().toLocaleString(),
         };
-        setChatHistory((prev) => [...prev, botMessage]);
+        setChatHistory((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage?.type === botMessage.type && lastMessage?.text === botMessage.text) {
+            return prev;
+          }
+          return [...prev, botMessage];
+        });
       }
     } catch (error) {
       const errorText = error.response?.data?.message || 'Uy, algo salió mal. ¿Intentamos de nuevo?';
@@ -74,7 +87,6 @@ const ChatBox = () => {
     } finally {
       setLoading(false);
       setMessage('');
-      scrollToBottom();
     }
   };
 
@@ -93,11 +105,7 @@ const ChatBox = () => {
           userAnswer,
         });
         if (response.data.success) {
-          const botMessage = {
-            type: 'bot',
-            text: response.data.message || `¡Gracias! Guardé tu respuesta: ${response.data.answer}`, // Usar message del backend
-            timestamp: new Date().toLocaleString(),
-          };
+          const botMessage = { type: 'bot', text: response.data.answer, timestamp: new Date().toLocaleString() };
           setChatHistory((prev) => [...prev, botMessage]);
           setOptions(null);
           setUserAnswer('');
@@ -112,7 +120,7 @@ const ChatBox = () => {
           setWebPreview(response.data.preview);
           const botMessage = {
             type: 'bot',
-            text: response.data.preview, // Mostrar directamente la previsualización
+            text: `Encontrado en la web: ${response.data.preview}. ¿Quieres guardar esta respuesta?`,
             isWebPreview: true,
             timestamp: new Date().toLocaleString(),
           };
@@ -130,7 +138,6 @@ const ChatBox = () => {
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
-      scrollToBottom();
     }
   };
 
@@ -143,46 +150,17 @@ const ChatBox = () => {
         confirmWeb: confirm,
       });
       if (confirm && response.data.success) {
-        const botMessage = {
-          type: 'bot',
-          text: response.data.message || '¡Guardado! Esa respuesta ya está en mi memoria.', // Usar message del backend
-          timestamp: new Date().toLocaleString(),
-        };
-        setChatHistory((prev) => [...prev, botMessage]);
-      } else if (!confirm) {
-        const botMessage = { type: 'bot', text: 'Vale, no lo guardo. ¿Qué más quieres hacer?', timestamp: new Date().toLocaleString() };
+        const botMessage = { type: 'bot', text: response.data.answer, timestamp: new Date().toLocaleString() };
         setChatHistory((prev) => [...prev, botMessage]);
       }
       setOptions(null);
       setWebPreview(null);
       setPendingQuestion(null);
     } catch (error) {
-      const errorText = error.response?.data?.message || 'Error al confirmar la respuesta';
-      const botMessage = { type: 'bot', text: errorText, timestamp: new Date().toLocaleString() };
+      const botMessage = { type: 'bot', text: 'Error al confirmar la respuesta', timestamp: new Date().toLocaleString() };
       setChatHistory((prev) => [...prev, botMessage]);
     } finally {
       setLoading(false);
-      scrollToBottom();
-    }
-  };
-
-  const handleAnotherJoke = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.post(`${BASE_URL}api/ask`, { question: 'Dime otro chiste' }, { timeout: 5000 });
-      const botMessage = {
-        type: 'bot',
-        text: response.data.answer,
-        isJoke: true, // Para seguir mostrando el botón
-        timestamp: new Date().toLocaleString(),
-      };
-      setChatHistory((prev) => [...prev, botMessage]);
-    } catch (error) {
-      const botMessage = { type: 'bot', text: 'Uy, se me acabaron los chistes por ahora.', timestamp: new Date().toLocaleString() };
-      setChatHistory((prev) => [...prev, botMessage]);
-    } finally {
-      setLoading(false);
-      scrollToBottom();
     }
   };
 
